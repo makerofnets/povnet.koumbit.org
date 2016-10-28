@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Povnet Content Types feature.
+ */
+
+include_once 'povnet_content_types.features.inc';

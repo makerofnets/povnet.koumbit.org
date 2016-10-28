@@ -1,0 +1,52 @@
+<?php
+// vim: set ft=php:
+
+public function complete($entity, stdClass $row) {
+  // add field collection field_paragraphe_group https://drupal.org/node/1842304
+  //drupal_debug($entity, 'MondeAlphaMigration::complete($entity)');
+  // TODO figure out if this is necessary
+  // remove old field_paragraphe_group entities from this node
+  /*
+  $to_delete = variable_get('cdeacf_migrate_field_collection_items_to_delete', array());
+  foreach ($entity->field_paragraphe_group[LANGUAGE_NONE] as $field_collection) {
+    $entity_id = $field_collection['value'];
+    //entity_delete('field_collection_item', $entity_id); // stops the migration
+    $to_delete[] = $entity_id;
+  }
+  $entity->field_paragraphe_group = array();
+  variable_set('cdeacf_migrate_field_collection_items_to_delete', array_unique($to_delete));
+  */
+  // add new values
+  $sizes = array();
+  $sizes[] = count($row->field_ma_img_paragraphe);
+  $sizes[] = count($row->field_ma_leg_img_par);
+  $sizes[] = count($row->field_ma_note_paragraphe);
+  $sizes[] = count($row->field_ma_paragraphe);
+  for ($i=0; $i<max($sizes); $i++) {
+    //drupal_debug("adding field_collection_item # $i \n");
+    $fc_item = entity_create('field_collection_item', array('field_name' => 'field_paragraphe_group'));
+    $fc_item->setHostEntity('node', $entity);
+    $fc_wrapper = entity_metadata_wrapper('field_collection_item', $fc_item);
+    if (isset($row->field_ma_img_paragraphe[$i])) {
+      $new_fid = db_query("SELECT destid1 FROM {migrate_map_file} WHERE sourceid1 = :old_fid",
+          array(':old_fid' => $row->field_ma_img_paragraphe[$i]))->fetchField();
+      $fc_item->field_ma_img_paragraphe[LANGUAGE_NONE][0]['fid'] = $new_fid;
+      $fc_item->field_ma_img_paragraphe[LANGUAGE_NONE][0]['uid'] = 1;
+    }
+    if (isset($row->field_ma_leg_img_par[$i])) {
+      $fc_item->field_ma_leg_img_par[LANGUAGE_NONE][0]['value'] = $row->field_ma_leg_img_par[$i];
+      $fc_item->field_ma_leg_img_par[LANGUAGE_NONE][0]['format'] = 2;
+    }
+    if (isset($row->field_ma_paragraphe[$i])) {
+      $fc_item->field_ma_paragraphe[LANGUAGE_NONE][0]['value'] = $row->field_ma_paragraphe[$i];
+      $fc_item->field_ma_paragraphe[LANGUAGE_NONE][0]['format'] = 2;
+    }
+    if (isset($row->field_ma_note_paragraphe[$i])) {
+      $fc_item->field_ma_note_paragraphe[LANGUAGE_NONE][0]['value'] = $row->field_ma_note_paragraphe[$i];
+      $fc_item->field_ma_note_paragraphe[LANGUAGE_NONE][0]['format'] = 2;
+    }
+    //drupal_debug($fc_item);
+    $fc_wrapper->save(TRUE);
+  }
+}
+

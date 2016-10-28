@@ -1,0 +1,41 @@
+  ; $Id: povnet.info,v 1.1 2009/12/25 18:00:00 mosatron Exp $
+
+  ; The name and description of the theme used on the admin/build/themes page.
+name        = PovNet
+description = Custom Drupal 6 theme for PovNet.
+screenshot = images/screenshot.png
+core   = 6.x
+engine = phptemplate
+
+stylesheets[all][]   = tabs.css
+stylesheets[all][]   = messages.css
+stylesheets[all][]   = block-editing.css
+stylesheets[all][]   = wireframes.css
+stylesheets[all][]   = style.css
+stylesheets[print][] = print.css
+
+conditional-stylesheets[if IE][all][] = ie.css
+
+  ; The regions defined in default page.tpl.php file and page-front.tpl.php
+
+regions[preface] = Preface
+regions[two_col_first_top] = Two column first top
+regions[two_col_sidebar_first] = Two column sidebar first
+regions[two_col_sidebar_last] = Two column sidebar last
+regions[two_col_last_top] = Two column last top
+regions[three_col_first] = Three column first
+regions[content_top] = Content top
+regions[three_col_last_top] = Three column last top
+regions[three_col_sidebar_first] = Three column sidebar first
+regions[three_col_sidebar_last] = Three column sidebar last
+regions[footer] = Footer
+
+  ; http://drupal.org/node/171205#features
+  
+features[] = name
+features[] = slogan
+features[] = mission
+features[] = node_user_picture
+features[] = comment_user_picture
+features[] = search
+

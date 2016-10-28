@@ -1,0 +1,645 @@
+<?php
+// vim: set ft=php:
+
+/**
+ * Common mappings for the Drupal 6 node migrations.
+ */
+abstract class NodeMigration extends DrupalNode6Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+
+    // common source fields to ignore
+    //$this->addFieldMapping(NULL, 'revision_uid');
+
+    // common destination fields to ignore
+    //$this->addFieldMapping('metatag_title', NULL);
+
+  }
+
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    if (isset($row->format) && $row->format == 2) {
+    }
+    if (isset($row->{'field_description_audio:format'})) {
+      $row->{'field_description_audio:format'} = 'filtered_html';
+    }
+    if (isset($row->{'field_renseignements:format'})) {
+      $row->{'field_renseignements:format'} = 'filtered_html';
+    }
+  }
+
+}
+
+class PageMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // field_image
+    $this->addFieldMapping('field_image', 'field_image')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_image:title', 'field_image:description');
+    $this->addFieldMapping('field_image:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_image:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_galerie_images
+    $this->addFieldMapping('field_galerie_images', 'field_galerie_images')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_galerie_images:title', 'field_galerie_images:description');
+    $this->addFieldMapping('field_galerie_images:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_galerie_images:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_fichier_attache
+    $this->addFieldMapping('field_fichier_attache', 'field_fichier_attache')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_fichier_attache:description', 'field_fichier_attache:description');
+    $this->addFieldMapping('field_fichier_attache:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_fichier_attache:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_audio, field_description_audio
+    $this->addFieldMapping('field_audio', 'field_audio')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_audio:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_audio:file_class')
+           ->defaultValue('MigrateFileFid');
+    $this->addFieldMapping('field_description_audio', 'field_description_audio');
+    $this->addFieldMapping('field_description_audio:format', 'field_description_audio:format');
+    // field_video, field_description_video
+    $this->addFieldMapping('field_video', 'field_video');
+    $this->addFieldMapping('field_description_video', 'field_description_video');
+    // taxonomy_vocabulary_12
+    $this->addFieldMapping('taxonomy_vocabulary_12', 12)
+          ->sourceMigration('ClassementDesArticles');
+    $this->addFieldMapping('taxonomy_vocabulary_12:source_type')
+          ->defaultValue('tid');
+    // upload
+    $this->addFieldMapping(NULL, 'upload');
+    $this->addFieldMapping(NULL, 'upload:description');
+    $this->addFieldMapping(NULL, 'upload:list');
+    $this->addFieldMapping(NULL, 'upload:weight');
+    $this->addFieldMapping('og_group_ref', 'group_nid')
+           ->sourceMigration('InstanceSyndicale');
+    /*
+    $this->addFieldMapping('upload', 'upload')
+           ->sourceMigration('File');
+    $this->addFieldMapping('upload:description', 'upload:description');
+    $this->addFieldMapping('upload:display', 'upload:list');
+    $this->addFieldMapping('upload:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('upload:file_class')
+           ->defaultValue('MigrateFileFid');
+    */
+  }
+  protected function query() {
+    $query = parent::query();
+    // place group posts into og
+    $query->join('og_ancestry', 'oga', 'n.nid = oga.nid');
+    $query->groupBy('n.nid');
+    //$query->fields('oga', array('group_nid'));
+    $query->addExpression('GROUP_CONCAT(group_nid)', 'group_nid');
+    return $query;
+  }
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    // concatenate groups into multi-valued field
+    $row->group_nid = explode(',', $row->group_nid);
+    //drupal_debug($row, 'PageMigration::prepareRow($row)');
+  }
+  public function prepare($entity, stdClass $row) {
+    //drupal_debug($entity, 'PageMigration::prepare($entity)');
+  }
+  public function complete($entity, stdClass $row) {
+    //drupal_debug($entity, 'PageMigration::complete($entity)');
+  }
+}
+
+class ArticleMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // field_teaser_image
+    $this->addFieldMapping('field_teaser_image', 'field_teaser_image')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_teaser_image:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_teaser_image:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_galerie_images
+    $this->addFieldMapping('field_galerie_images', 'field_galerie_images')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_galerie_images:title', 'field_galerie_images:description');
+    $this->addFieldMapping('field_galerie_images:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_galerie_images:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_fichier_attache
+    $this->addFieldMapping('field_fichier_attache', 'field_fichier_attache')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_fichier_attache:description', 'field_fichier_attache:description');
+    $this->addFieldMapping('field_fichier_attache:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_fichier_attache:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_audio, field_description_audio
+    $this->addFieldMapping('field_audio', 'field_audio')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_audio:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_audio:file_class')
+           ->defaultValue('MigrateFileFid');
+    $this->addFieldMapping('field_description_audio', 'field_description_audio');
+    $this->addFieldMapping('field_description_audio:format', 'field_description_audio:format');
+    // field_video, field_description_video
+    $this->addFieldMapping('field_video', 'field_video');
+    $this->addFieldMapping('field_description_video', 'field_description_video');
+    // taxonomy_vocabulary_12
+    $this->addFieldMapping('taxonomy_vocabulary_12', 12)
+          ->sourceMigration('ClassementDesArticles');
+    $this->addFieldMapping('taxonomy_vocabulary_12:source_type')
+          ->defaultValue('tid');
+    // taxonomy_vocabulary_16
+    $this->addFieldMapping('taxonomy_vocabulary_16', 16)
+          ->sourceMigration('Themes');
+    $this->addFieldMapping('taxonomy_vocabulary_16:source_type')
+          ->defaultValue('tid');
+    // field_co_auteur
+    $this->addFieldMapping('field_co_auteur', 'field_co_auteur')
+          ->sourceMigration('User');
+    // upload
+    $this->addFieldMapping(NULL, 'upload');
+    $this->addFieldMapping(NULL, 'upload:description');
+    $this->addFieldMapping(NULL, 'upload:list');
+    $this->addFieldMapping(NULL, 'upload:weight');
+    $this->addFieldMapping('og_group_ref', 'group_nid')
+           ->sourceMigration('InstanceSyndicale');
+  }
+  protected function query() {
+    $query = parent::query();
+    // place group posts into og
+    $query->join('og_ancestry', 'oga', 'n.nid = oga.nid');
+    $query->groupBy('n.nid');
+    //$query->fields('oga', array('group_nid'));
+    $query->addExpression('GROUP_CONCAT(group_nid)', 'group_nid');
+    return $query;
+  }
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    // concatenate groups into multi-valued field
+    $row->group_nid = explode(',', $row->group_nid);
+    //drupal_debug($row, 'ArticleMigration::prepareRow($row)');
+  }
+  public function prepare($entity, stdClass $row) {
+    //drupal_debug($entity, 'ArticleMigration::prepare($entity)');
+  }
+  public function complete($entity, stdClass $row) {
+    //drupal_debug($entity, 'ArticleMigration::complete($entity)');
+  }
+}
+
+class ConferenceEtCoursMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // field_teaser_image
+    $this->addFieldMapping('field_teaser_image', 'field_teaser_image')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_teaser_image:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_teaser_image:file_class')
+           ->defaultValue('MigrateFileFid');
+    // taxonomy_vocabulary_12
+    $this->addFieldMapping('taxonomy_vocabulary_12', 12)
+          ->sourceMigration('ClassementDesArticles');
+    $this->addFieldMapping('taxonomy_vocabulary_12:source_type')
+          ->defaultValue('tid');
+    // taxonomy_vocabulary_16
+    $this->addFieldMapping('taxonomy_vocabulary_16', 16)
+          ->sourceMigration('Themes');
+    $this->addFieldMapping('taxonomy_vocabulary_16:source_type')
+          ->defaultValue('tid');
+    // field_video_conference
+    $this->addFieldMapping('field_video_conference', 'field__video_conference');
+    // field_co_auteur
+    $this->addFieldMapping('field_co_auteur', 'field_co_auteur')
+          ->sourceMigration('User');
+    $this->addFieldMapping('og_group_ref', 'group_nid')
+           ->sourceMigration('InstanceSyndicale');
+  }
+  protected function query() {
+    $query = parent::query();
+    // place group posts into og
+    $query->join('og_ancestry', 'oga', 'n.nid = oga.nid');
+    $query->groupBy('n.nid');
+    //$query->fields('oga', array('group_nid'));
+    $query->addExpression('GROUP_CONCAT(group_nid)', 'group_nid');
+    return $query;
+  }
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    // concatenate groups into multi-valued field
+    $row->group_nid = explode(',', $row->group_nid);
+  }
+}
+
+class FlashNouvellesMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // field_fichier_attache_a
+    $this->addFieldMapping('field_fichier_attache_a', 'field_fichier_attache_a')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_fichier_attache_a:display', 'field_fichier_attache_a:list');
+    $this->addFieldMapping('field_fichier_attache_a:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_fichier_attache_a:file_class')
+           ->defaultValue('MigrateFileFid');
+  }
+}
+
+class SujetDeDiscussionMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // taxonomy_forums
+    $this->addFieldMapping('taxonomy_forums', 18)
+          ->sourceMigration('Forums');
+    $this->addFieldMapping('taxonomy_forums:source_type')
+          ->defaultValue('tid');
+  }
+}
+
+class GalerieDImagesMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // taxonomy_vocabulary_12
+    $this->addFieldMapping('taxonomy_vocabulary_12', 12)
+          ->sourceMigration('ClassementDesArticles');
+    $this->addFieldMapping('taxonomy_vocabulary_12:source_type')
+          ->defaultValue('tid');
+    // taxonomy_vocabulary_16
+    $this->addFieldMapping('taxonomy_vocabulary_16', 16)
+          ->sourceMigration('Themes');
+    $this->addFieldMapping('taxonomy_vocabulary_16:source_type')
+          ->defaultValue('tid');
+    // field_teaser_image
+    $this->addFieldMapping('field_teaser_image', 'field_teaser_image')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_teaser_image:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_teaser_image:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_galerie_images
+    $this->addFieldMapping('field_galerie_images', 'field_galerie_images')
+           ->sourceMigration('File');
+    //$this->addFieldMapping('field_galerie_images:title', 'field_galerie_images:description');
+    $this->addFieldMapping('field_galerie_images:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_galerie_images:file_class')
+           ->defaultValue('MigrateFileFid');
+    $this->addFieldMapping('og_group_ref', 'group_nid')
+           ->sourceMigration('InstanceSyndicale');
+  }
+  protected function query() {
+    $query = parent::query();
+    // place group posts into og
+    $query->join('og_ancestry', 'oga', 'n.nid = oga.nid');
+    $query->groupBy('n.nid');
+    //$query->fields('oga', array('group_nid'));
+    $query->addExpression('GROUP_CONCAT(group_nid)', 'group_nid');
+    return $query;
+  }
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    // concatenate groups into multi-valued field
+    $row->group_nid = explode(',', $row->group_nid);
+  }
+}
+
+class GalerieVideoMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // taxonomy_vocabulary_12
+    $this->addFieldMapping('taxonomy_vocabulary_12', 12)
+          ->sourceMigration('ClassementDesArticles');
+    $this->addFieldMapping('taxonomy_vocabulary_12:source_type')
+          ->defaultValue('tid');
+    // taxonomy_vocabulary_16
+    $this->addFieldMapping('taxonomy_vocabulary_16', 16)
+          ->sourceMigration('Themes');
+    $this->addFieldMapping('taxonomy_vocabulary_16:source_type')
+          ->defaultValue('tid');
+    // field_galerie_video
+    $this->addFieldMapping('field_galerie_video', 'field_galerie_video');
+  }
+}
+
+class ImageMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // field_imageunique
+    $this->addFieldMapping('field_imageunique', 'field_imageunique')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_imageunique:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_imageunique:file_class')
+           ->defaultValue('MigrateFileFid');
+  }
+}
+
+class InstanceSyndicaleMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    $this->addFieldMapping('group_group');
+    $this->addFieldMapping('field_contact', 'recipients');
+    $this->addFieldMapping('field_contact_texte', 'info');
+    // upload
+    $this->addFieldMapping(NULL, 'upload');
+    $this->addFieldMapping(NULL, 'upload:description');
+    $this->addFieldMapping(NULL, 'upload:list');
+    $this->addFieldMapping(NULL, 'upload:weight');
+  }
+  protected function query() {
+    $query = parent::query();
+    // fetch og_contact data
+    $query->leftJoin('og_contact', 'ogc', 'n.nid = ogc.gid');
+    $query->leftJoin('og_uid', 'ogu', 'n.nid = ogu.nid AND ogu.is_admin = 1');
+    $query->leftJoin('users', 'u', 'ogu.uid = u.uid');
+    $query->groupBy('n.nid');
+    $query->fields('ogc', array('recipients', 'info'));
+    $query->addExpression('GROUP_CONCAT(mail)', 'admin_mail');
+    //drupal_debug($query, 'InstanceSyndicaleMigration::query($query)');
+    return $query;
+  }
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    // concatenate admin_mail & recipients into multi-valued field
+    $row->admin_mail = $row->admin_mail ? explode(',', $row->admin_mail) : array();
+    $row->recipients = $row->recipients ? explode(',', $row->recipients) : array();
+    $contact = array_unique(array_merge($row->admin_mail, $row->recipients));
+    asort($contact);
+    $contact = array_values($contact);
+    $row->recipients = $contact;
+    // remove html tags
+    $row->info = strip_tags($row->info);
+    // indicate that this is a group
+    $row->group_group = TRUE;
+    //drupal_debug($row, 'InstanceSyndicaleMigration::prepareRow($row)');
+  }
+  public function prepare($entity, stdClass $row) {
+    //drupal_debug($entity, 'InstanceSyndicaleMigration::prepare($entity)');
+  }
+  public function complete($entity, stdClass $row) {
+    //drupal_debug($entity, 'InstanceSyndicaleMigration::complete($entity)');
+  }
+}
+
+class ImageSlideshowMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // field_img_slideshow
+    $this->addFieldMapping('field_img_slideshow', 'field_img_slideshow')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_img_slideshow:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_img_slideshow:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_noeudrelie
+    $this->addFieldMapping('field_noeudrelie', 'field_noeudrelie')
+           ->sourceMigration(array('Article', 'GalerieDImages', 'GalerieVideo', 'ConferenceEtCours'));
+    // upload
+    $this->addFieldMapping(NULL, 'upload');
+    $this->addFieldMapping(NULL, 'upload:description');
+    $this->addFieldMapping(NULL, 'upload:list');
+    $this->addFieldMapping(NULL, 'upload:weight');
+  }
+  public function prepareRow(stdClass $row) {
+    // set of nid's from source site corresponding to types on source site
+    // select ctis.nid, n.nid, type from content_type_img_slideshow ctis left join node n on ctis.field_noeudrelie_nid = n.nid order by type, ctis.nid
+    $row->RelatedNodes['ConferenceEtCours'] = array(886);
+    $row->RelatedNodes['GalerieDImages'] = array(289, 291, 292, 293, 300, 301,
+          315, 316, 323, 327, 330, 331, 341, 342, 349, 609);
+    $row->RelatedNodes['GalerieVideo'] = array(314, 340);
+    $row->RelatedNodes['Article'] = array(406, 412, 455, 456, 508, 637, 694,
+          717, 734, 736, 746, 766, 820, 831, 855, 873, 883, 901, 910, 926, 941,
+          954, 956, 958, 967, 974, 998, 999, 1017, 1032);
+    //drupal_debug($row, 'ImageSlideshowMigration::prepareRow($row)');
+  }
+  public function prepare($entity, stdClass $row) {
+    // passing an array to sourceMigration() is in theory supposed to do the following...
+    foreach (array_keys($row->RelatedNodes) as $mySourceMigration) {
+      if (in_array($row->field_noeudrelie, $row->RelatedNodes[$mySourceMigration])) {
+        $result = parent::handleSourceMigration($mySourceMigration, $row->field_noeudrelie);
+        if ($result) {
+          $entity->field_noeudrelie['und'][0]['nid'] = $result;
+        }
+      }
+    }
+    //drupal_debug($entity, 'ImageSlideshowMigration::prepare($entity)');
+  }
+  public function complete($entity, stdClass $row) {
+    //drupal_debug($entity, 'ImageSlideshowMigration::complete($entity)');
+  }
+}
+
+class ModeDEmploiMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // field_image
+    $this->addFieldMapping('field_image', 'field_image')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_image:title', 'field_image:description');
+    $this->addFieldMapping('field_image:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_image:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_galerie_images
+    $this->addFieldMapping('field_galerie_images', 'field_galerie_images')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_galerie_images:title', 'field_galerie_images:description');
+    $this->addFieldMapping('field_galerie_images:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_galerie_images:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_fichier_attache
+    $this->addFieldMapping('field_fichier_attache', 'field_fichier_attache')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_fichier_attache:description', 'field_fichier_attache:description');
+    $this->addFieldMapping('field_fichier_attache:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_fichier_attache:file_class')
+           ->defaultValue('MigrateFileFid');
+    // taxonomy_vocabulary_13
+    $this->addFieldMapping('taxonomy_vocabulary_13', 13)
+          ->sourceMigration('ModesDEmploi');
+    $this->addFieldMapping('taxonomy_vocabulary_13:source_type')
+          ->defaultValue('tid');
+    // field_video, field_description_video
+    $this->addFieldMapping('field_video', 'field_video');
+    $this->addFieldMapping('field_description_video', 'field_description_video');
+    // upload
+    $this->addFieldMapping(NULL, 'upload');
+    $this->addFieldMapping(NULL, 'upload:description');
+    $this->addFieldMapping(NULL, 'upload:list');
+    $this->addFieldMapping(NULL, 'upload:weight');
+  }
+}
+
+class FaqMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // taxonomy_vocabulary_16
+    $this->addFieldMapping('taxonomy_vocabulary_16', 16)
+          ->sourceMigration('Themes');
+    $this->addFieldMapping('taxonomy_vocabulary_16:source_type')
+          ->defaultValue('tid');
+    // field_classement_des_questions
+    $this->addFieldMapping('field_classement_des_questions', 14)
+          ->sourceMigration('ClassementDesQuestions');
+    $this->addFieldMapping('field_classement_des_questions:source_type')
+          ->defaultValue('tid');
+    // upload
+    $this->addFieldMapping(NULL, 'upload');
+    $this->addFieldMapping(NULL, 'upload:description');
+    $this->addFieldMapping(NULL, 'upload:list');
+    $this->addFieldMapping(NULL, 'upload:weight');
+  }
+}
+
+class WebformMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // upload
+    $this->addFieldMapping(NULL, 'upload');
+    $this->addFieldMapping(NULL, 'upload:description');
+    $this->addFieldMapping(NULL, 'upload:list');
+    $this->addFieldMapping(NULL, 'upload:weight');
+  }
+}
+
+class DatesImportantesMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // field_renseignements
+    $this->addFieldMapping('field_renseignements', 'field_renseignements');
+    $this->addFieldMapping('field_renseignements:format', 'field_renseignements:format');
+    // field_teaser_image
+    $this->addFieldMapping('field_teaser_image', 'field_teaser_image')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_teaser_image:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_teaser_image:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_image
+    $this->addFieldMapping('field_image', 'field_image')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_image:title', 'field_image:description');
+    $this->addFieldMapping('field_image:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_image:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_galerie_images
+    $this->addFieldMapping('field_galerie_images', 'field_galerie_images')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_galerie_images:title', 'field_galerie_images:description');
+    $this->addFieldMapping('field_galerie_images:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_galerie_images:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_fichier_attache
+    $this->addFieldMapping('field_fichier_attache', 'field_fichier_attache')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_fichier_attache:description', 'field_fichier_attache:description');
+    $this->addFieldMapping('field_fichier_attache:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_fichier_attache:file_class')
+           ->defaultValue('MigrateFileFid');
+    // field_audio, field_description_audio
+    $this->addFieldMapping('field_audio', 'field_audio')
+           ->sourceMigration('File');
+    $this->addFieldMapping('field_audio:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_audio:file_class')
+           ->defaultValue('MigrateFileFid');
+    $this->addFieldMapping('field_description_audio', 'field_description_audio');
+    $this->addFieldMapping('field_description_audio:format', 'field_description_audio:format');
+    // field_video, field_description_video
+    $this->addFieldMapping('field_video', 'field_video');
+    $this->addFieldMapping('field_description_video', 'field_description_video');
+    // upload
+    $this->addFieldMapping(NULL, 'upload');
+    $this->addFieldMapping(NULL, 'upload:description');
+    $this->addFieldMapping(NULL, 'upload:list');
+    $this->addFieldMapping(NULL, 'upload:weight');
+    // taxonomy_vocabulary_16
+    $this->addFieldMapping('taxonomy_vocabulary_16', 16)
+          ->sourceMigration('Themes');
+    $this->addFieldMapping('taxonomy_vocabulary_16:source_type')
+          ->defaultValue('tid');
+    // field_date_debut
+    $this->addFieldMapping('field_date_debut', 'field_date_debut');
+    $this->addFieldMapping('field_date_debut:to', 'field_date_debut:value2');
+    // field_lieu -> field_adresse (see also query() method)
+    $this->addFieldMapping(NULL, 'field_lieu');
+    $this->addFieldMapping('field_adresse', 'country');
+    $this->addFieldMapping('field_adresse:administrative_area', 'province');
+    $this->addFieldMapping('field_adresse:sub_administrative_area', NULL);
+    $this->addFieldMapping('field_adresse:locality', 'city');
+    $this->addFieldMapping('field_adresse:dependent_locality', NULL);
+    $this->addFieldMapping('field_adresse:premise', 'additional');
+    $this->addFieldMapping('field_adresse:sub_premise', NULL);
+    $this->addFieldMapping('field_adresse:organisation_name', NULL);
+    $this->addFieldMapping('field_adresse:name_line', 'name');
+    $this->addFieldMapping('field_adresse:first_name', 'name');
+    $this->addFieldMapping('field_adresse:last_name', NULL);
+    $this->addFieldMapping('field_adresse:postal_code', 'postal_code');
+    $this->addFieldMapping('field_adresse:thoroughfare', 'street');
+    $this->addFieldMapping('field_adresse:data', NULL);
+    $this->addFieldMapping('og_group_ref', 'group_nid')
+           ->sourceMigration('InstanceSyndicale');
+  }
+  protected function query() {
+    $query = parent::query();
+    // Join location table (works with location & location_cck)
+    $query->join('location_instance', 'i', 'i.nid = n.nid AND i.vid = n.vid');
+    $query->join('location', 'l', 'l.lid = i.lid');
+    // Don't bother with latitude & longitude; these can be geocoded again after migration
+    $query->fields('l', array('name', 'street', 'additional', 'city', 'province', 'postal_code', 'country'));
+    // place group posts into og
+    $query->join('og_ancestry', 'oga', 'n.nid = oga.nid');
+    $query->groupBy('n.nid');
+    //$query->fields('oga', array('group_nid'));
+    $query->addExpression('GROUP_CONCAT(group_nid)', 'group_nid');
+    //drupal_debug($query, 'DatesImportantesMigration::query($query)');
+    return $query;
+  }
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    // all these addresses are in montréal
+    $row->city = 'Montréal';
+    $row->province = 'QC';
+    $row->country = 'CA';
+    // concatenate groups into multi-valued field
+    $row->group_nid = explode(',', $row->group_nid);
+    //drupal_debug($row, 'DatesImportantesMigration::prepareRow($row)');
+  }
+  public function prepare($entity, stdClass $row) {
+    //drupal_debug($entity, 'DatesImportantesMigration::prepare($entity)');
+  }
+  public function complete($entity, stdClass $row) {
+    //drupal_debug($entity, 'DatesImportantesMigration::complete($entity)');
+  }
+
+}
+

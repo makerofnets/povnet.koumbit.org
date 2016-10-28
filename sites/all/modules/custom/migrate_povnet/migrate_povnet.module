@@ -1,0 +1,226 @@
+<?php
+
+/**
+ * Implements hook_flush_caches().
+ */
+function migrate_povnet_flush_caches() {
+  migrate_povnet_register_migrations();
+}
+
+/**
+ * Register all migrations.
+ */
+function migrate_povnet_register_migrations() {
+
+  /**
+   * Each migration being registered takes an array of arguments, some required
+   * and some optional. Start with the common arguments required by all - the
+   * source_connection (connection key, set up in settings.php, pointing to
+   * the Drupal 6 database), source_version (major version of Drupal), and
+   * group_name (a.k.a. import job).
+   */
+  $common_arguments = array(
+    'source_connection' => 'source',
+    'source_version' => 6,
+  );
+
+  $role_arguments = $common_arguments + array(
+    'machine_name' => 'Role',
+    'group_name' => 'PovnetUser',
+    'description' => t('Import Drupal 6 roles'),
+    'role_mappings' => array(
+      'administrator' => 'administrator',
+    ),
+  );
+
+  // We just use the migrate_d2d D6 migration class as-is.
+  Migration::registerMigration('DrupalRole6Migration',
+        $role_arguments['machine_name'], $role_arguments);
+
+  // The description and the migration machine name are also required arguments,
+  // which will be unique for each migration you register.
+  $user_arguments = $common_arguments + array(
+    'description' => t('Migration of users from Drupal 6'),
+    'machine_name' => 'User',
+    'role_migration' => 'Role',
+    'group_name' => 'PovnetUser',
+  );
+
+  // Invoke our migration class which includes profile mappings.
+  Migration::registerMigration('UserMigration', $user_arguments['machine_name'],
+                               $user_arguments);
+
+  // For vocabulary migrations, source_vocabulary and destination_vocabulary are
+  // required arguments. Note that in Drupal 6 vocabularies did not have machine
+  // names, so we use the vocabulary ID to uniquely identify them.
+  $vocabulary_arguments = array(
+    array(
+      'description' => t('Migration of Location terms from Drupal 6'),
+      'machine_name' => 'Location',
+      'source_vocabulary' => 3,  // D6 Vocabulary ID
+      'destination_vocabulary' => 'vocabulary_3',
+    ),
+    array(
+      'description' => t('Migration of Language terms from Drupal 6'),
+      'machine_name' => 'Language',
+      'source_vocabulary' => 4,  // D6 Vocabulary ID
+      'destination_vocabulary' => 'vocabulary_4',
+    ),
+    array(
+      'description' => t('Migration of Issues terms from Drupal 6'),
+      'machine_name' => 'Issues',
+      'source_vocabulary' => 5,  // D6 Vocabulary ID
+      'destination_vocabulary' => 'vocabulary_5',
+    ),
+    array(
+      'description' => t('Migration of TypeOfAdvocacy terms from Drupal 6'),
+      'machine_name' => 'TypeOfAdvocacy',
+      'source_vocabulary' => 7,  // D6 Vocabulary ID
+      'destination_vocabulary' => 'vocabulary_7',
+    ),
+    array(
+      'description' => t('Migration of UsingPovNet terms from Drupal 6'),
+      'machine_name' => 'UsingPovNet',
+      'source_vocabulary' => 9,  // D6 Vocabulary ID
+      'destination_vocabulary' => 'vocabulary_9',
+    ),
+    array(
+      'description' => t('Migration of FindingHelpTags terms from Drupal 6'),
+      'machine_name' => 'FindingHelpTags',
+      'source_vocabulary' => 29,  // D6 Vocabulary ID
+      'destination_vocabulary' => 'vocabulary_29',
+    ),
+    array(
+      'description' => t('Migration of ResearchAndAnalysisTags terms from Drupal 6'),
+      'machine_name' => 'ResearchAndAnalysisTags',
+      'source_vocabulary' => 30,  // D6 Vocabulary ID
+      'destination_vocabulary' => 'vocabulary_30',
+    ),
+    array(
+      'description' => t('Migration of ResourceType terms from Drupal 6'),
+      'machine_name' => 'ResourceType',
+      'source_vocabulary' => 32,  // D6 Vocabulary ID
+      'destination_vocabulary' => 'vocabulary_32',
+    ),
+    array(
+      'description' => t('Migration of FindingHelpIssues terms from Drupal 6'),
+      'machine_name' => 'FindingHelpIssues',
+      'source_vocabulary' => 33,  // D6 Vocabulary ID
+      'destination_vocabulary' => 'finding_help_issues',
+    ),
+  );
+
+  // The soft dependency says that while we don't have to run the user migration
+  // first, we want to make sure it's listed first so the vocubularies are
+  // listed right ahead of the node migrations.
+  $common_vocabulary_arguments = $common_arguments + array(
+    'class_name' => 'TermMigration',
+    'soft_dependencies' => array('User'),
+    'group_name' => 'PovnetVocab',
+  );
+  foreach ($vocabulary_arguments as $arguments) {
+    $arguments += $common_vocabulary_arguments;
+    Migration::registerMigration($arguments['class_name'], $arguments['machine_name'],
+                                 $arguments);
+  }
+
+  $file_arguments = $common_arguments + array(
+    'machine_name' => 'File',
+    'description' => t('Import Drupal 6 files'),
+    'user_migration' => 'User',
+    'default_uid' => 1,
+    'source_dir' => '/var/alternc/html/p/povnet/www/povnet.koumbit.org/sites/default/files',
+    //'file_replace' => FILE_EXISTS_REUSE,
+    'file_replace' => -1,
+    'destination_dir' => 'public://',
+    'group_name' => 'PovnetFile',
+  );
+  Migration::registerMigration('FileMigration',
+    $file_arguments['machine_name'], $file_arguments);
+
+  // Node migrations - each has its own class derived from the migrate_d2d class,
+  // specifying its particular field mappings and transformations. source_type
+  // and destination_type are required arguments.
+  $node_arguments = array(
+    array(
+      'class_name' => 'ApplicationsFormsMigration',
+      'description' => t('Migration of ApplicationsForms nodes from Drupal 6'),
+      'machine_name' => 'ApplicationsForms',
+      'source_type' => 'apps',
+      'destination_type' => 'apps',
+      'dependencies' => array('File'),
+      // TODO can reference: ApplicationsForms, FindAnAdvocate, OnlineResource
+    ),
+    array(
+      'class_name' => 'ArticleMigration',
+      'description' => t('Migration of Article nodes from Drupal 6'),
+      'machine_name' => 'Article',
+      'source_type' => 'article',
+      'destination_type' => 'article',
+      'dependencies' => array('File'),
+      // TODO can reference: applications/forms, article, find_an_advocate, online_resource
+      // TODO remove references to event/event_new
+    ),
+    array(
+      'class_name' => 'FindAnAdvocateMigration',
+      'description' => t('Migration of FindAnAdvocate nodes from Drupal 6'),
+      'machine_name' => 'FindAnAdvocate',
+      'source_type' => 'find_an_advocate',
+      'destination_type' => 'find_an_advocate',
+      'dependencies' => array('File'),
+    ),
+    array(
+      'class_name' => 'OnlineResourceMigration',
+      'description' => t('Migration of OnlineResource nodes from Drupal 6'),
+      'machine_name' => 'OnlineResource',
+      'source_type' => 'online_resource',
+      'destination_type' => 'online_resource',
+      'dependencies' => array('File'),
+      // TODO can reference: online_resource
+    ),
+  );
+  // Tell the node migrations where the users are coming from, so they can
+  // set up the dependency and resolve D6->D7 uids.
+  $common_node_arguments = $common_arguments + array(
+    'user_migration' => 'User',
+    'file_migration' => 'File',
+    'group_name' => 'PovnetNode',
+  );
+  foreach ($node_arguments as $arguments) {
+    $arguments = array_merge_recursive($arguments, $common_node_arguments);
+    Migration::registerMigration($arguments['class_name'], $arguments['machine_name'],
+                                 $arguments);
+  }
+
+  /*
+  // Menu migrations -- same requirements as users
+  $menu_arguments = $common_arguments + array(
+    'description' => t('Migration of menus from Drupal 6'),
+    'machine_name' => 'Menu',
+    'group_name' => 'PovnetMenu',
+  );
+  // We just use the migrate_d2d D7 migration class as-is.
+  Migration::registerMigration('DrupalMenu7Migration', $menu_arguments['machine_name'],
+                               $menu_arguments);
+  // Menu links migrations -- basic requirements, plus must set up menu dependency
+  $menu_links_arguments = $common_arguments + array(
+    'description' => t('Migration of menu links from Drupal 6'),
+    'machine_name' => 'MenuLinks',
+    'menu_migration' => $menu_arguments['machine_name'],
+    'group_name' => 'PovnetMenu',
+  );
+  Migration::registerMigration('DrupalMenuLinks7Migration', $menu_links_arguments['machine_name'],
+                               $menu_links_arguments);
+  */
+
+}
+
+/**
+ * Implements hook_migrate_api().
+ */
+function migrate_povnet_migrate_api() {
+  $api = array(
+    'api' => 2,
+  );
+  return $api;
+}

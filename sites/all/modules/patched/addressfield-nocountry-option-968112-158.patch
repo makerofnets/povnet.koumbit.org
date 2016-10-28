@@ -1,0 +1,95 @@
+diff --git a/addressfield.module b/addressfield.module
+index c010514..b39d121 100644
+--- a/addressfield.module
++++ b/addressfield.module
+@@ -391,9 +391,40 @@ function addressfield_default_values($available_countries = NULL) {
+  * Implements hook_field_is_empty().
+  */
+ function addressfield_field_is_empty($item, $field) {
+-  // Every address field must have at least a country value or it is considered
+-  // empty, even if it has name information.
+-  return empty($item['country']);
++
++  // We need the field instance to check to see if country is optional and if
++  // default country is the same as the currently set country. In that case we
++  // consider the field to be empty.
++  // @TODO - it might be safer still to have a flag that says to count
++  // submissions with country-only as empty when there is a default country.
++  $default_country = $optional_country = FALSE;
++  if (isset($item['element_key'])) {
++    $instance_keys = explode('|', $item['element_key']);
++    list($entity_type, $bundle_name, $field_name) = $instance_keys;
++    $field_instance = field_info_instance($entity_type, $field_name, $bundle_name);
++    if (isset($field_instance['widget']['settings']['format_handlers']['optional-country'])) {
++      $optional_country = $field_instance['widget']['settings']['format_handlers']['optional-country'];
++    }
++    if (isset($field_instance['default_value'][0]['country'])) {
++      $default_country = $field_instance['default_value'][0]['country'];
++    }
++  }
++
++  // @TODO - $optional_country should be a boolean to match similar settings
++  $ignore_item_keys = array('element_key', '_weight');
++  if ($optional_country && $default_country && $default_country == $item['country']) {
++    $ignore_item_keys[] = 'country';
++  }
++
++  foreach ($item as $field_name => $field_value) {
++    if (in_array($field_name, $ignore_item_keys)) {
++      continue;
++    }
++    if (!empty($field_value)) {
++      return FALSE;
++    }
++  }
++  return TRUE;
+ }
+ 
+ /**
+@@ -500,7 +531,7 @@ function addressfield_field_widget_form(&$form, &$form_state, $field, $instance,
+     // Use the value from the form_state if available.
+     $address = $form_state['addressfield'][$element_key];
+   }
+-  elseif (!empty($items[$delta]['country'])) {
++  elseif (count($items) && isset($items[$delta]) && !addressfield_field_is_empty($items[$delta], NULL)) {
+     // Else use the saved value for the field.
+     $address = $items[$delta];
+   }
+@@ -517,7 +548,7 @@ function addressfield_field_widget_form(&$form, &$form_state, $field, $instance,
+   }
+ 
+   // Merge in default values to provide a value for every expected array key.
+-  $address += addressfield_default_values($countries);
++  $address += addressfield_default_values($countries, isset($settings['format_handlers']['optional-country']));
+ 
+   // Add the form elements for the standard widget, which includes a country
+   // select list at the top that reloads the available address elements when the
+diff --git a/plugins/format/optional-country.inc b/plugins/format/optional-country.inc
+new file mode 100644
+index 0000000..7a2a02c
+--- /dev/null
++++ b/plugins/format/optional-country.inc
+@@ -0,0 +1,23 @@
++<?php
++
++/**
++ * @file
++ * Makes the country field optional.
++ */
++
++$plugin = array(
++  'title' => t('Make country optional'),
++  'format callback' => 'addressfield_format_address_optional_country',
++  'type' => 'address',
++  'weight' => -80,
++);
++
++/**
++ * Format callback.
++ *
++ * @see CALLBACK_addressfield_format_callback()
++ */
++function addressfield_format_address_optional_country(&$format, $address, $context = array()) {
++  $format['country']['#required'] = FALSE;
++  $format['country']['#empty_value'] = '';
++}

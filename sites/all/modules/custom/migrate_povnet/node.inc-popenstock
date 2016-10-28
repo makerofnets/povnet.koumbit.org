@@ -1,0 +1,282 @@
+<?php
+// vim: set tags=./tags,./TAGS,tags,TAGS,/var/aegir/platforms/drupal-7-2013.11.27-dev/tags:
+
+/**
+ * Common mappings for the Drupal 6 node migrations.
+ */
+abstract class NodeMigration extends DrupalNode7Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+
+    // common source fields to ignore
+    $this->addFieldMapping(NULL, 'upload');
+    $this->addFieldMapping(NULL, 'upload:description');
+    $this->addFieldMapping(NULL, 'upload:list');
+    $this->addFieldMapping(NULL, 'upload:weight');
+    $this->addFieldMapping(NULL, 'revision');
+    $this->addFieldMapping(NULL, 'log');
+
+  }
+
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+  }
+}
+
+class PageMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+  }
+}
+
+class IndividuMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    $this->addFieldMapping(NULL, 'field_dir_dossier');
+    $this->addFieldMapping(NULL, 'field_auteur_article');
+    $this->addFieldMapping(NULL, 'field_blogue');
+    $this->addFieldMapping(NULL, 'field_zone_libre');
+    $this->addFieldMapping('field_liens', NULL);
+    $this->addFieldMapping('field_statut_individu', 'field_statut');
+  }
+
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    $row->field_statut = str_replace(
+        array("Collaborateur article", "Responsable dossier"),
+        array("Collaborateur d'article", "Responsable de dossier"),
+        $row->field_statut);
+
+    //drupal_debug($row, 'IndividuMigration::prepareRow($row)');
+  }
+
+  public function prepare($entity, stdClass $row) {
+    //drupal_debug($entity, 'IndividuMigration::prepare($entity)');
+  }
+
+  public function complete($entity, stdClass $row) {
+    //drupal_debug($entity, 'IndividuMigration::complete($entity)');
+  }
+
+}
+
+class BlogueMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // title_field is set automatically
+    $this->addFieldMapping(NULL, 'field_biblio');
+    $this->addFieldMapping('field_taxonomie_aires_recherche');
+    $this->addFieldMapping('field_taxonomie_provenance');
+    $this->addFieldMapping('field_taxonomie_epoque');
+    $this->addFieldMapping('field_taxonomie_savoirs');
+    $this->addFieldMapping('field_taxonomie_contenu');
+    $this->addFieldMapping('field_image_couverture', 'field_image')
+         ->sourceMigration('File');
+    $this->addFieldMapping(NULL, 'field_image:list');
+    $this->addFieldMapping('field_image_couverture:title', 'field_image:description');
+    $this->addFieldMapping('field_image_couverture:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_image_couverture:file_class')
+           ->defaultValue('MigrateFileFid');
+    $this->addFieldMapping('field_auteur', 'field_auteur')
+           ->sourceMigration('Individu');
+    $this->addFieldMapping('field_type', 1)
+          ->sourceMigration('TypeDeBlogue');
+    $this->addFieldMapping('field_type:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_taxo_themes_concepts', 2)
+          ->sourceMigration('ThemesEtConcepts');
+    $this->addFieldMapping('field_taxo_themes_concepts:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_taxo_genres', 3)
+          ->sourceMigration('Genres');
+    $this->addFieldMapping('field_taxo_genres:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_taxo_medias', 4)
+          ->sourceMigration('Medias');
+    $this->addFieldMapping('field_taxo_medias:source_type')
+          ->defaultValue('tid');
+  }
+
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    //drupal_debug($row, 'BlogueMigration::prepareRow($row)');
+    // skip podcast blogs
+    if ($row->{1}[0] == 98) {
+      return FALSE;
+    }
+  }
+
+}
+
+class PodcastMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // title_field is set automatically
+    $this->addFieldMapping(NULL, 'field_biblio');
+    $this->addFieldMapping('field_taxonomie_aires_recherche');
+    $this->addFieldMapping('field_taxonomie_provenance');
+    $this->addFieldMapping('field_taxonomie_epoque');
+    $this->addFieldMapping('field_taxonomie_savoirs');
+    $this->addFieldMapping('field_taxonomie_contenu');
+    $this->addFieldMapping('field_image_couverture', 'field_image')
+         ->sourceMigration('File');
+    $this->addFieldMapping(NULL, 'field_image:list');
+    $this->addFieldMapping('field_image_couverture:title', 'field_image:description');
+    $this->addFieldMapping('field_image_couverture:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_image_couverture:file_class')
+           ->defaultValue('MigrateFileFid');
+    $this->addFieldMapping('field_auteur', 'field_auteur')
+           ->sourceMigration('Individu');
+    $this->addFieldMapping('field_taxo_themes_concepts', 2)
+          ->sourceMigration('ThemesEtConcepts');
+    $this->addFieldMapping('field_taxo_themes_concepts:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_taxo_genres', 3)
+          ->sourceMigration('Genres');
+    $this->addFieldMapping('field_taxo_genres:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_taxo_medias', 4)
+          ->sourceMigration('Medias');
+    $this->addFieldMapping('field_taxo_medias:source_type')
+          ->defaultValue('tid');
+  }
+
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    //drupal_debug($row, 'PodcastMigration::prepareRow($row)');
+    // skip non-podcast blogs
+    if ($row->{1}[0] != 98) {
+      return FALSE;
+    }
+  }
+
+}
+
+class ArticleZoneLibreMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // title_field is set automatically
+    $this->addFieldMapping(NULL, 'field_biblio');
+    $this->addFieldMapping('field_taxonomie_aires_recherche');
+    $this->addFieldMapping('field_taxonomie_provenance');
+    $this->addFieldMapping('field_taxonomie_epoque');
+    $this->addFieldMapping('field_taxonomie_savoirs');
+    $this->addFieldMapping('field_taxonomie_contenu');
+    $this->addFieldMapping('field_image_couverture', 'field_image')
+         ->sourceMigration('File');
+    $this->addFieldMapping(NULL, 'field_image:list');
+    $this->addFieldMapping('field_image_couverture:title', 'field_image:description');
+    $this->addFieldMapping('field_image_couverture:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_image_couverture:file_class')
+           ->defaultValue('MigrateFileFid');
+    $this->addFieldMapping('field_auteur', 'field_auteur')
+           ->sourceMigration('Individu');
+    $this->addFieldMapping('field_taxo_themes_concepts', 2)
+          ->sourceMigration('ThemesEtConcepts');
+    $this->addFieldMapping('field_taxo_themes_concepts:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_embed_video', 'field_embed_video');
+  }
+
+  /*
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    drupal_debug($row, 'ArticleZoneLibreMigration::prepareRow($row)');
+  }
+  public function prepare($entity, stdClass $row) {
+    drupal_debug($entity, 'ArticleZoneLibreMigration::prepare($entity)');
+  }
+  public function complete($entity, stdClass $row) {
+    drupal_debug($entity, 'ArticleZoneLibreMigration::complete($entity)');
+  }
+  */
+
+}
+
+class ArticleMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // title_field is set automatically
+    $this->addFieldMapping(NULL, 'field_biblio');
+    $this->addFieldMapping('field_taxonomie_aires_recherche');
+    $this->addFieldMapping('field_taxonomie_provenance');
+    $this->addFieldMapping('field_taxonomie_epoque');
+    $this->addFieldMapping('field_taxonomie_savoirs');
+    $this->addFieldMapping('field_taxonomie_contenu');
+    $this->addFieldMapping('field_image_couverture', 'field_image')
+         ->sourceMigration('File');
+    $this->addFieldMapping(NULL, 'field_image:list');
+    $this->addFieldMapping('field_image_couverture:title', 'field_image:description');
+    $this->addFieldMapping('field_image_couverture:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_image_couverture:file_class')
+           ->defaultValue('MigrateFileFid');
+    $this->addFieldMapping('field_auteur', 'field_auteur')
+           ->sourceMigration('Individu');
+    $this->addFieldMapping('field_taxo_themes_concepts', 2)
+          ->sourceMigration('ThemesEtConcepts');
+    $this->addFieldMapping('field_taxo_themes_concepts:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_taxo_genres', 3)
+          ->sourceMigration('Genres');
+    $this->addFieldMapping('field_taxo_genres:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_taxo_medias', 4)
+          ->sourceMigration('Medias');
+    $this->addFieldMapping('field_taxo_medias:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_embed_video', 'field_embed_video');
+    $this->addFieldMapping('field_dossier', 'field_dossier')
+           ->sourceMigration('Dossier');
+  }
+}
+
+class DossierMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // title_field is set automatically
+    $this->addFieldMapping('field_taxonomie_aires_recherche');
+    $this->addFieldMapping('field_taxonomie_provenance');
+    $this->addFieldMapping('field_taxonomie_epoque');
+    $this->addFieldMapping('field_taxonomie_savoirs');
+    $this->addFieldMapping('field_taxonomie_contenu');
+    $this->addFieldMapping('field_image_couverture', 'field_image')
+         ->sourceMigration('File');
+    $this->addFieldMapping(NULL, 'field_image:list');
+    $this->addFieldMapping('field_image_couverture:title', 'field_image:description');
+    $this->addFieldMapping('field_image_couverture:preserve_files')
+         ->defaultValue(TRUE);
+    $this->addFieldMapping('field_image_couverture:file_class')
+           ->defaultValue('MigrateFileFid');
+    $this->addFieldMapping('field_directeur', 'field_directeur')
+           ->sourceMigration('Individu');
+    $this->addFieldMapping('field_taxo_themes_concepts', 2)
+          ->sourceMigration('ThemesEtConcepts');
+    $this->addFieldMapping('field_taxo_themes_concepts:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_taxo_genres', 3)
+          ->sourceMigration('Genres');
+    $this->addFieldMapping('field_taxo_genres:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_taxo_medias', 4)
+          ->sourceMigration('Medias');
+    $this->addFieldMapping('field_taxo_medias:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping(NULL, 'field_article');
+    $this->addFieldMapping(NULL, 'field_dossier_associe');
+    $this->addFieldMapping(NULL, 'field_articles_associes');
+  }
+}

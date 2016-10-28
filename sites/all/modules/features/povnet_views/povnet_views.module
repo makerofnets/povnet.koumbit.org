@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Povnet Views feature.
+ */
+
+include_once 'povnet_views.features.inc';

@@ -1,0 +1,83 @@
+diff --git a/addressfield.install b/addressfield.install
+index ada5912..c5a7a6c 100644
+--- a/addressfield.install
++++ b/addressfield.install
+@@ -184,3 +184,27 @@ function addressfield_update_7000() {
+     }
+   }
+ }
++
++/**
++ * Update field widget settings to include the organisation label.
++ */
++function addressfield_update_7001() {
++  // Get the list of fields of type 'addressfield'.
++  $address_fields = array();
++  foreach (field_info_fields() as $field_name => $field_info) {
++    if ($field_info['type'] == 'addressfield') {
++      $address_fields[$field_name] = $field_name;
++    }
++  }
++
++  foreach (field_info_instances() as $entity_type => $bundles) {
++    foreach ($bundles as $bundle_name => $instances) {
++      foreach (array_intersect_key($instances, $address_fields) as $field_name => $instance) {
++        if (!isset($instance['widget']['settings']['organisation_label'])) {
++          $instance['widget']['settings']['organisation_label'] = t('Company');
++          field_update_instance($instance);
++        }
++      }
++    }
++  }
++}
+diff --git a/addressfield.module b/addressfield.module
+index c010514..05da00c 100644
+--- a/addressfield.module
++++ b/addressfield.module
+@@ -437,6 +437,7 @@ function addressfield_field_widget_info() {
+     'settings' => array(
+       'available_countries' => array(),
+       'format_handlers' => array('address'),
++      'organisation_label' => t('Company'),
+     ),
+   );
+ 
+@@ -468,6 +469,17 @@ function addressfield_field_widget_settings_form($field, $instance) {
+       '#options' => addressfield_format_plugins_options(),
+       '#default_value' => $settings['format_handlers'],
+     );
++
++    $form['organisation_label'] = array(
++      '#type' => 'textfield',
++      '#title' => t('Organisation Field Label'),
++      '#default_value' => $settings['organisation_label'],
++      '#states' => array(
++        'visible' => array(
++          '[name="instance[widget][settings][format_handlers][organisation]"]' => array('checked' => TRUE),
++        ),
++      ),
++    );
+   }
+ 
+   return $form;
+diff --git a/plugins/format/organisation.inc b/plugins/format/organisation.inc
+index 9edb290..846f932 100644
+--- a/plugins/format/organisation.inc
++++ b/plugins/format/organisation.inc
+@@ -17,14 +17,14 @@ $plugin = array(
+  *
+  * @see CALLBACK_addressfield_format_callback()
+  */
+-function addressfield_format_organisation_generate(&$format, $address) {
++function addressfield_format_organisation_generate(&$format, $address, $context) {
+   $format['organisation_block'] = array(
+     '#type' => 'addressfield_container',
+     '#attributes' => array('class' => array('addressfield-container-inline', 'name-block')),
+     '#weight' => -50,
+   );
+   $format['organisation_block']['organisation_name'] = array(
+-    '#title' => t('Company'),
++    '#title' => t($context['instance']['widget']['settings']['organisation_label']),
+     '#size' => 30,
+     '#attributes' => array(
+       'class' => array('organisation-name'),

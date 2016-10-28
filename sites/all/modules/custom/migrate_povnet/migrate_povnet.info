@@ -1,0 +1,15 @@
+name = "D6 to D7 migration"
+description = "Migrate content from D6 site to D7"
+package = "Development"
+core = 7.x
+
+dependencies[] = devel
+dependencies[] = migrate
+dependencies[] = migrate_ui
+dependencies[] = migrate_d2d
+dependencies[] = migrate_extras
+
+files[] = node.inc
+files[] = user.inc
+files[] = term.inc
+files[] = file.inc

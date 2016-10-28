@@ -1,0 +1,546 @@
+<?php
+
+/**
+ * Common mappings for the Drupal 7 node migrations.
+ */
+abstract class NodeMigration extends DrupalNode7Migration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // common source fields to ignore
+    $this->addFieldMapping(NULL, 'revision');
+    $this->addFieldMapping(NULL, 'revision_uid');
+    $this->addFieldMapping(NULL, 'log');
+    // metatags
+    $this->addFieldMapping('metatag_title', NULL);
+    $this->addFieldMapping('metatag_description', NULL);
+    $this->addFieldMapping('metatag_abstract', NULL);
+    $this->addFieldMapping('metatag_keywords', NULL);
+    $this->addFieldMapping('metatag_robots', NULL);
+    $this->addFieldMapping('metatag_news_keywords', NULL);
+    $this->addFieldMapping('metatag_standout', NULL);
+    $this->addFieldMapping('metatag_generator', NULL);
+    $this->addFieldMapping('metatag_image_src', NULL);
+    $this->addFieldMapping('metatag_canonical', NULL);
+    $this->addFieldMapping('metatag_shortlink', NULL);
+    $this->addFieldMapping('metatag_publisher', NULL);
+    $this->addFieldMapping('metatag_author', NULL);
+    $this->addFieldMapping('metatag_original-source', NULL);
+    $this->addFieldMapping('metatag_revisit-after', NULL);
+  }
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+  }
+  public function _create_node($type, $title, $description = NULL) {
+    $values = array(
+      'type' => $type,
+      'uid' => 1,
+      'status' => 1,
+      'comment' => 0,
+      'promote' => 0,
+    );
+    $entity = entity_create('node', $values);
+    $ewrapper = entity_metadata_wrapper('node', $entity);
+    $ewrapper->title->set($title);
+    if ($description) {
+      $ewrapper->field_chapeau->set(array('value' => $description));
+    }
+    $ewrapper->save();
+    return $entity;
+  }
+  public function _fetch_image($nid, $new_nid = NULL) {
+    // http://www.actualites.uqam.ca/sites/default/files/site/default/upload/<YEAR>/<NID>_<SUFFIX>.jpg
+    $base_url = 'http://www.actualites.uqam.ca/sites/default/files/';
+    $image_suffixes = array('o', 'g', 'v', 'm', 'p', 'archive', 'mini', 'rss');
+    $image_years = array(2014, 2013, 2012, 2011);
+    $image = FALSE;
+    foreach($image_years as $image_year) {
+      foreach($image_suffixes as $image_suffix) {
+        $filename = sprintf('%s_%s.jpg', $nid, $image_suffix);
+        $local_path = sprintf('site/default/upload/%s/%s', $image_year, $filename);
+        $file_uri = 'public://' . $local_path; // /home/mvc/actualites.uqam.ca/3023_Institutionnel_Actualites/sites/default/files/
+        if (is_readable($file_uri)) {
+          $image = file_uri_to_object($file_uri);
+          $image->uid = 1;
+          if (!isset($image->fid)) {
+            file_save($image);
+          }
+          $image_url = $base_url . $local_path;
+          drupal_debug("image=$image_url => $file_uri (source={$nid} dest={$new_nid})");
+          //drupal_debug($image);
+          break;
+        }
+      }
+    }
+    return $image;
+  }
+  public function _insert_image($row, $entity, $image) {
+    if (isset($row->field_cr_dit_photo_la_une) || isset($row->field_l_gende_la_une) || strpos($row->body[0], 'src="/sites/default/files/site/default/upload/201') !== FALSE || $image) {
+      $credit = isset($row->field_cr_dit_photo_la_une) ? $row->field_cr_dit_photo_la_une[0] : '';
+      $legende = isset($row->field_l_gende_la_une) ? $row->field_l_gende_la_une[0] : '';
+      if (!$image) {
+        drupal_debug("WARN: can't find image file! source={$row->nid} dest={$entity->nid} in NouvelleMigration::complete()");
+      }
+
+      // nid 2814
+      $entity->body['und'][0]['value'] = preg_replace('@^<div class="field field-name-body field-type-text-with-summary field-label-hidden"><div class="field-items"><div class="field-item even">@', '', $entity->body['und'][0]['value']);
+      // nid 4458
+      $entity->body['und'][0]['value'] = preg_replace('@^<p><!--break--></p>@', '', $entity->body['und'][0]['value']);
+      // nid 4452
+      $entity->body['und'][0]['value'] = preg_replace('@^<p>&nbsp;</p>@', '', $entity->body['und'][0]['value']);
+      // nid 2942
+      $entity->body['und'][0]['value'] = preg_replace('@^<p class="photo549"><img src="@', '<div class="photo549"><img src="/', $entity->body['und'][0]['value']);
+      // nid 4125
+      $entity->body['und'][0]['value'] = preg_replace('@<span [^>]*>\s*</span>@', '', $entity->body['und'][0]['value']);
+      // nid 2832, nid 2980
+      $entity->body['und'][0]['value'] = preg_replace('@^<div[^>]*><div@', '<div', $entity->body['und'][0]['value']);
+
+      // remove img tag
+      $entity->body['und'][0]['value'] = preg_replace('@^<div[^>]*>(<a [^>]*>)?<img [^>]*>(</a>)?\s*(<br>\s*)*@', '', $entity->body['und'][0]['value']);
+
+      // extract credits
+      if (preg_match('@<span class="credits">(.*?)</span>@', $entity->body['und'][0]['value'], $matches)) {
+        $tmp = preg_replace('@<br[^>]*>@', '', $matches[1]);
+        $tmp = trim(preg_replace('@&nbsp;@', ' ', $tmp));
+        if ($tmp) {
+          $credit = $tmp;
+        }
+        $entity->body['und'][0]['value'] = preg_replace('@<span class="(credits|legende)">(.*?)</span>@', '', $entity->body['und'][0]['value'], 1);
+      }
+
+      // extract legende
+      if (preg_match('@<div class="legende">(.*?)</div>@', $entity->body['und'][0]['value'], $matches)) {
+        $tmp = $matches[1];
+        $tmp = trim(preg_replace('@&nbsp;@', ' ', $tmp));
+        if ($tmp) {
+          $legende = $tmp;
+        }
+        $entity->body['und'][0]['value'] = preg_replace('@<div class="legende">(.*?)</div>@', '', $entity->body['und'][0]['value'], 1);
+      }
+
+      // remove image's closing </div>
+      $entity->body['und'][0]['value'] = preg_replace('@^\s*(</(div|p)>)+@', '', $entity->body['und'][0]['value']);
+
+      // insert image field collection
+      if ($credit || $legende || $image) {
+        // the associated field collections seem to be wiped out before the
+        // prepare() method is called, so we rebuild the field collection each time
+        /*
+        if (isset($entity->field_collection_image)) {
+          $fc_item = entity_load('field_collection_item', $entity->field_collection_image[LANGUAGE_NONE][0]['value']);
+        }
+        else {
+          $fc_item = entity_create('field_collection_item', array('field_name' => 'field_collection_image'));
+          $fc_item->setHostEntity('node', $entity);
+        }
+        */
+        $fc_item = entity_create('field_collection_item', array('field_name' => 'field_collection_image'));
+        $fc_item->setHostEntity('node', $entity);
+        $fc_wrapper = entity_metadata_wrapper('field_collection_item', $fc_item);
+        if ($image) {
+          /*
+          $data = array();
+          $data['field_image_fid'] = $image->fid;
+          $data['field_image_width'] = isset($image->metadata['width']) ? $image->metadata['width'] : '';
+          $data['field_image_height'] = isset($image->metadata['height']) ? $image->metadata['height'] : '';
+          $data['field_image_alt'] = isset($image->alt) ? $image->alt : '';
+          $data['field_image_title'] = isset($image->title) ? $image->title : '';
+          $fc_wrapper->field_image->set($data);
+          */
+          // the field collection entity seems to expect to be passed the file object!?
+          $fc_wrapper->field_image->set((array) $image);
+          // if not already done, tell drupal that the container node is
+          // using the image as well as the field_collection_image entity, or
+          // else during subsequent migrations the file will be removed from disk
+          $usage = file_usage_list($image);
+          if (!isset($usage['file']['node'][$entity->nid])) {
+            file_usage_add($image, 'file', 'node', $entity->nid);
+          }
+        }
+        if ($credit) {
+          //drupal_debug($credit, "credit");
+          $fc_wrapper->field_credit_photo->set(truncate_utf8($credit, 250, TRUE, TRUE, 5));
+        }
+        if ($legende) {
+          //drupal_debug($legende, 'legende');
+          $fc_wrapper->field_legende->set(array('value' => $legende, 'format' => 'html_limite', 'value_format' => 'html_limite'));
+        }
+        $fc_wrapper->save(TRUE);
+      }
+    }
+    return $entity;
+  }
+  public function _insert_video($row, $entity) {
+    // find videos in body or the video field; migrate to field_collection_video.field_video
+    if (isset($row->field_video) || strpos($row->body[0], '<iframe src="//www.youtube.com/') !== FALSE) {
+      $video_url = NULL;
+      // //www.youtube.com/embed/mnE8v9MecAc -> https://www.youtube.com/watch?v=mnE8v9MecAc
+      if (isset($row->field_video)) {
+        $video_url = 'https://www.youtube.com/watch?v=' . array_pop(explode('/', $row->field_video[0]));
+      }
+      else {
+        if (preg_match('@<iframe src="//www.youtube.com/embed/([^/"]*)[^>]*></iframe>@', $row->body[0], $matches)) {
+          $video_url = 'https://www.youtube.com/watch?v=' . $matches[1];
+        }
+      }
+      $entity->body['und'][0]['value'] = preg_replace(
+          '@<iframe src="//www.youtube.com/[^>]*></iframe>@',
+          '',
+          $entity->body['und'][0]['value']);
+      if ($entity->body['und'][0]['summary'] && strpos($entity->body['und'][0]['summary'], '<iframe src="//www.youtube.com/') !== FALSE) {
+        $entity->body['und'][0]['summary'] = preg_replace(
+            '@<iframe src="//www.youtube.com/[^>]*></iframe>@',
+            '',
+            $entity->body['und'][0]['summary']);
+      }
+      // the associated field collections seem to be wiped out before the
+      // prepare() method is called, so we rebuild the field collection each time
+      if ($video_url) {
+        $fc_item = entity_create('field_collection_item', array('field_name' => 'field_collection_video'));
+        $fc_item->setHostEntity('node', $entity);
+        $fc_wrapper = entity_metadata_wrapper('field_collection_item', $fc_item);
+        $fc_wrapper->field_video->set(array('video_url' => $video_url));
+        $fc_wrapper->save(TRUE);
+      }
+    }
+    return $entity;
+  }
+}
+
+class NouvelleMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // deleted
+    $this->addFieldMapping(NULL, 'field_img_annee');
+    $this->addFieldMapping(NULL, 'field_uqam');
+    $this->addFieldMapping(NULL, 'field_entrevue_sur_uqam');
+    $this->addFieldMapping(NULL, 'field_description');
+    $this->addFieldMapping(NULL, 'field_a_la_une_accueil');
+    $this->addFieldMapping(NULL, 'field_a_la_une_section');
+    $this->addFieldMapping(NULL, 'field_uqam_tv');
+    $this->addFieldMapping(NULL, 'field_vedette_accueil');
+    $this->addFieldMapping(NULL, 'field_vedette_recherche');
+    $this->addFieldMapping(NULL, 'field_vedette_scene');
+    $this->addFieldMapping(NULL, 'field_vedette_culture');
+    $this->addFieldMapping(NULL, 'field_vedette_sports');
+    // migrated
+    $this->addFieldMapping('field_titre',               'field_titre_pour_rss');
+    $this->addFieldMapping('field_chapeau',             'field_chapeau');
+    $this->addFieldMapping('field_date_de_mise_a_jour', 'field_date_de_mise_jour');
+    // vocabularies
+    $this->addFieldMapping('field_categorie_affiliation', 'field_autres_affiliations')
+      ->sourceMigration('AutresAffiliations');
+    $this->addFieldMapping('field_categorie_departement', 'field_departements')
+      ->sourceMigration('Departements');
+    $this->addFieldMapping('field_categorie_faculte',     'field_taxo_ecole')
+      ->sourceMigration('EcoleFaculte');
+    $this->addFieldMapping('field_categorie_principale',  'field_cat_gorie_archive')
+      ->sourceMigration('CategoriePrincipale');
+    $this->addFieldMapping('field_categorie_public',      'field_taxo_public')
+      ->sourceMigration('Personnes');
+    $this->addFieldMapping('field_categorie_secondaire',  'field_cat_gories_principales')
+      ->sourceMigration('CategoriesSecondaires');
+    $this->addFieldMapping('field_categorie_sujet',       'field_taxo_sujet')
+      ->sourceMigration('SujetsSecondaires');
+    $this->addFieldMapping('field_categorie_affiliation:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_departement:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_faculte:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_principale:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_public:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_secondaire:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_sujet:source_type')
+          ->defaultValue('tid');
+    // node reference with multiple possible sources
+    $this->addFieldMapping('field_article_connexe', 'field_articles_connexes')
+      ->sourceMigration('Nouvelle', 'Nouvelle2012', 'Archives');
+    // map taxonomy term to node reference
+    $this->addFieldMapping('field_serie', 'field_serie')
+      ->sourceMigration('Series');
+    $this->addFieldMapping('field_serie:source_type')
+          ->defaultValue('tid');
+    // map text field to node reference
+    $this->addFieldMapping('field_auteur', 'field_auteur');
+  }
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    if (!isset($row->field_chapeau[0]) && isset($row->{'body:summary'}[0])) {
+      $row->field_chapeau = $row->{'body:summary'};
+    }
+    $row->{'body:format'}[0] = 'full_html';
+    // set of nid's from source site corresponding to types on source site for field_article_connexe
+    $query_result = db_select('migrate_map_archives', 'mma')
+                ->fields('mma', array('sourceid1'))
+                ->execute()
+                ->fetchAllAssoc('sourceid1');
+    $row->RelatedNodes['Archives'] = array_keys($query_result);
+    $query_result = db_select('migrate_map_nouvelle', 'mmn')
+                ->fields('mmn', array('sourceid1'))
+                ->execute()
+                ->fetchAllAssoc('sourceid1');
+    $row->RelatedNodes['Nouvelle'] = array_keys($query_result);
+    $query_result = db_select('migrate_map_nouvelle2012', 'mmnn')
+                ->fields('mmnn', array('sourceid1'))
+                ->execute()
+                ->fetchAllAssoc('sourceid1');
+    $row->RelatedNodes['Nouvelle2012'] = array_keys($query_result);
+    //drupal_debug($row, 'NouvelleMigration::prepareRow($row)');
+  }
+  public function prepare($entity, stdClass $row) {
+    if (isset($row->field_titre_pour_rss[0])) {
+      $entity->title = $row->field_titre_pour_rss[0];
+    }
+    $entity->field_titre[LANGUAGE_NONE][0]['value'] = str_replace('&', '&amp;', $row->title);
+    $entity->field_titre[LANGUAGE_NONE][0]['format'] = 'html_limite';
+    $entity->field_titre[LANGUAGE_NONE][0]['value_format'] = 'html_limite';
+    if (isset($entity->field_chapeau[LANGUAGE_NONE][0]['value'])) {
+      $entity->field_chapeau[LANGUAGE_NONE][0]['format'] = 'html_limite';
+      $entity->field_chapeau[LANGUAGE_NONE][0]['value_format'] = 'html_limite';
+    }
+    // find new nid's for entity reference field_article_connexe
+    /*
+      http://www.actualites.uqam.ca/node/4216/devel -> 2382, 2010
+      http://actualites.mvc.aegirnt2.uqam.ca/node/551/devel -> 2251, 4510
+     */
+    // passing an array to sourceMigration() is in theory supposed to do the following...
+    if (isset($row->field_articles_connexes)) {
+      foreach ($row->field_articles_connexes as $i => $this_article_connexe) {
+        foreach (array_keys($row->RelatedNodes) as $mySourceMigration) {
+          if (in_array($row->field_articles_connexes[$i], $row->RelatedNodes[$mySourceMigration])) {
+            $result = parent::handleSourceMigration($mySourceMigration, $row->field_articles_connexes[$i]);
+            if ($result) {
+              $entity->field_article_connexe[LANGUAGE_NONE][$i]['target_id'] = $result;
+              break;
+            }
+          }
+        }
+      }
+    }
+    // map taxonomy terms to node reference
+    if ($entity->field_serie) {
+      // multi-valued field but currently all nodes have only one value
+      $serie_tid = $entity->field_serie[LANGUAGE_NONE][0]['target_id'];
+      $serie_term = taxonomy_term_load($serie_tid);
+      // find if there's a serie type node with the title $serie_term->name
+      // if not, create one with field_chapeau set to $serie_term->description
+      // set entity reference target_id to this (possibly new) nid
+      $query = new EntityFieldQuery();
+      $entities = $query->entityCondition('entity_type', 'node')
+        ->propertyCondition('type', 'serie')
+        ->propertyCondition('title', $serie_term->name)
+        ->propertyCondition('status', 1)
+        ->range(0,1)
+        ->execute();
+      if (!empty($entities['node'])) {
+        $node = node_load(array_shift(array_keys($entities['node'])));
+        $entity->field_serie[LANGUAGE_NONE][0]['target_id'] = $node->nid;
+        //drupal_debug("found série node {$node->nid} for term $serie_tid ({$serie_term->name})");
+      }
+      else {
+        //drupal_debug("no série node found for term $serie_tid ({$serie_term->name})");
+        $node = NouvelleMigration::_create_node('serie', $serie_term->name, $serie_term->description);
+        //drupal_debug($node, "new série node");
+        $entity->field_serie[LANGUAGE_NONE][0]['target_id'] = $node->nid;
+      }
+    }
+    // map text field to node reference
+    if (isset($row->field_auteur)) {
+      // multi-valued field but currently all nodes have only one value
+      // exception: "Marie-Claude Bourdon et Claude Gauvreau" (source: 4251 target: 588)
+      $auteurs = $row->field_auteur;
+      if ($auteurs[0] == "Marie-Claude Bourdon et Claude Gauvreau") {
+        $auteurs[0] = "Marie-Claude Bourdon";
+        $auteurs[1] = "Claude Gauvreau";
+      }
+      foreach ($auteurs as $i => $auteur) {
+        // find if there's an individu type node with the title $auteur; if not, create one
+        // set entity reference target_id to this (possibly new) nid
+        $query = new EntityFieldQuery();
+        $entities = $query->entityCondition('entity_type', 'node')
+          ->propertyCondition('type', 'individu')
+          ->propertyCondition('title', $auteur)
+          ->propertyCondition('status', 1)
+          ->range(0,1)
+          ->execute();
+        $node = NULL;
+        if (!empty($entities['node'])) {
+          $node = node_load(array_shift(array_keys($entities['node'])));
+          //drupal_debug("found individu node {$node->nid} for $auteur i=$i");
+        }
+        else {
+          //drupal_debug("no individu node found for $auteur i=$i");
+          $node = NouvelleMigration::_create_node('individu', $auteur);
+          //drupal_debug($node, "new individu node");
+        }
+        $entity->field_auteur[LANGUAGE_NONE][$i]['target_id'] = $node->nid;
+      }
+    }
+    //drupal_debug($entity, 'NouvelleMigration::prepare($entity)');
+  }
+  public function complete($entity, stdClass $row) {
+    $image = NouvelleMigration::_fetch_image($row->nid, $entity->nid);
+    $entity = NouvelleMigration::_insert_image($row, $entity, $image);
+    $entity = NouvelleMigration::_insert_video($row, $entity);
+    //drupal_debug($entity, 'NouvelleMigration::complete($entity)');
+  }
+}
+
+class Nouvelle2012Migration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // deleted
+    $this->addFieldMapping(NULL, 'field_img_annee');
+    $this->addFieldMapping(NULL, 'field_uqam');
+    $this->addFieldMapping(NULL, 'field_description');
+    $this->addFieldMapping(NULL, 'field_a_la_une_accueil');
+    $this->addFieldMapping(NULL, 'field_a_la_une_section');
+    $this->addFieldMapping(NULL, 'field_vedette_accueil');
+    $this->addFieldMapping(NULL, 'field_vedette_recherche');
+    $this->addFieldMapping(NULL, 'field_vedette_scene');
+    $this->addFieldMapping(NULL, 'field_vedette_culture');
+    $this->addFieldMapping(NULL, 'field_vedette_sports');
+    $this->addFieldMapping(NULL, 'meta_keywords');
+    $this->addFieldMapping(NULL, 'meta_description');
+    $this->addFieldMapping(NULL, 'field_img_annee');
+    $this->addFieldMapping(NULL, 'field_rss');
+    $this->addFieldMapping(NULL, 'field_rss:alt');
+    $this->addFieldMapping(NULL, 'field_rss:title');
+    $this->addFieldMapping(NULL, 'field_rss:height');
+    $this->addFieldMapping(NULL, 'field_rss:width');
+    $this->addFieldMapping(NULL, 'field_rss:height');
+    $this->addFieldMapping(NULL, 'field_img_intro');
+    $this->addFieldMapping(NULL, 'field_img_legende');
+    $this->addFieldMapping(NULL, 'field_img_corps');
+    $this->addFieldMapping(NULL, 'field_img_corps_clic');
+    $this->addFieldMapping(NULL, 'field_image_2');
+    $this->addFieldMapping(NULL, 'field_img_legende_2');
+    $this->addFieldMapping(NULL, 'field_image_3');
+    $this->addFieldMapping(NULL, 'field_img_legende_3');
+    $this->addFieldMapping(NULL, 'field_img_classe');
+    // migrated
+    $this->addFieldMapping('field_titre',               'field_titre_pour_rss');
+    $this->addFieldMapping('field_chapeau',             'field_chapeau');
+    $this->addFieldMapping('field_date_de_mise_a_jour', 'field_date_de_mise_jour');
+    // vocabularies
+    $this->addFieldMapping('field_categorie_affiliation', 'field_autres_affiliations')
+      ->sourceMigration('AutresAffiliations');
+    $this->addFieldMapping('field_categorie_departement', 'field_departements')
+      ->sourceMigration('Departements');
+    $this->addFieldMapping('field_categorie_faculte',     'field_taxo_ecole')
+      ->sourceMigration('EcoleFaculte');
+    $this->addFieldMapping('field_categorie_principale',  'field_cat_gorie_archive')
+      ->sourceMigration('CategoriePrincipale');
+    $this->addFieldMapping('field_categorie_public',      'field_taxo_public')
+      ->sourceMigration('Personnes');
+    $this->addFieldMapping('field_categorie_secondaire',  'field_cat_gories_principales')
+      ->sourceMigration('CategoriesSecondaires');
+    $this->addFieldMapping('field_categorie_sujet',       'field_taxo_sujet')
+      ->sourceMigration('SujetsSecondaires');
+    $this->addFieldMapping('field_categorie_affiliation:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_departement:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_faculte:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_principale:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_public:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_secondaire:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_sujet:source_type')
+          ->defaultValue('tid');
+  }
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    if (!isset($row->field_chapeau[0]) && isset($row->{'body:summary'}[0])) {
+      $row->field_chapeau = $row->{'body:summary'};
+    }
+    $row->{'body:format'}[0] = 'full_html';
+    //drupal_debug($row, 'Nouvelle2012Migration::prepareRow($row)');
+  }
+  public function prepare($entity, stdClass $row) {
+    if (isset($row->field_titre_pour_rss[0])) {
+      $entity->title = $row->field_titre_pour_rss[0];
+    }
+    $entity->field_titre[LANGUAGE_NONE][0]['value'] = str_replace('&', '&amp;', $row->title);
+    $entity->field_titre[LANGUAGE_NONE][0]['format'] = 'html_limite';
+    $entity->field_titre[LANGUAGE_NONE][0]['value_format'] = 'html_limite';
+    if (isset($entity->field_chapeau[LANGUAGE_NONE][0]['value'])) {
+      $entity->field_chapeau[LANGUAGE_NONE][0]['format'] = 'html_limite';
+      $entity->field_chapeau[LANGUAGE_NONE][0]['value_format'] = 'html_limite';
+    }
+    //drupal_debug($entity, 'Nouvelle2012Migration::prepare($entity)');
+  }
+  public function complete($entity, stdClass $row) {
+    $image = Nouvelle2012Migration::_fetch_image($row->nid, $entity->nid);
+    $entity = Nouvelle2012Migration::_insert_image($row, $entity, $image);
+    //drupal_debug($entity, 'Nouvelle2012Migration::complete($entity)');
+  }
+}
+
+class ArchivesMigration extends NodeMigration {
+  public function __construct(array $arguments) {
+    parent::__construct($arguments);
+    // deleted
+    $this->addFieldMapping(NULL, 'field_uqam');
+    $this->addFieldMapping(NULL, 'meta_keywords');
+    $this->addFieldMapping(NULL, 'meta_description');
+    // vocabularies
+    $this->addFieldMapping('field_categorie_faculte',     'field_taxo_ecole')
+      ->sourceMigration('EcoleFaculte');
+    $this->addFieldMapping('field_categorie_sujet',       'field_taxo_sujet')
+      ->sourceMigration('SujetsSecondaires');
+    $this->addFieldMapping('field_categorie_public',      'field_taxo_public')
+      ->sourceMigration('Personnes');
+    $this->addFieldMapping('field_categorie_faculte:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_public:source_type')
+          ->defaultValue('tid');
+    $this->addFieldMapping('field_categorie_sujet:source_type')
+          ->defaultValue('tid');
+  }
+  public function prepareRow($row) {
+    if (parent::prepareRow($row) === FALSE) {
+      return FALSE;
+    }
+    $row->{'body:format'}[0] = 'full_html';
+    //drupal_debug($row, 'ArchivesMigration::prepareRow($entity)');
+  }
+  public function prepare($entity, stdClass $row) {
+    // chapeau
+    if (isset($entity->body[LANGUAGE_NONE][0]['summary']) && $entity->body[LANGUAGE_NONE][0]['summary']) {
+      $entity->field_chapeau[LANGUAGE_NONE][0]['value'] = $entity->body[LANGUAGE_NONE][0]['summary'];
+      $entity->field_chapeau[LANGUAGE_NONE][0]['format'] = 'html_limite';
+      $entity->field_chapeau[LANGUAGE_NONE][0]['value_format'] = 'html_limite';
+    }
+    // title
+    $entity->field_titre[LANGUAGE_NONE][0]['value'] = str_replace('&', '&amp;', $row->title);
+    $entity->field_titre[LANGUAGE_NONE][0]['format'] = 'html_limite';
+    $entity->field_titre[LANGUAGE_NONE][0]['value_format'] = 'html_limite';
+    //drupal_debug($entity, 'ArchivesMigration::prepare($entity)');
+  }
+  public function complete($entity, stdClass $row) {
+    // normalize http://www.nouvelles.uqam.ca/IMG to /IMG
+    if (isset($entity->body['und'][0]['value']) && strpos($entity->body['und'][0]['value'], '<img src="http://www.nouvelles.uqam.ca') !== FALSE) {
+      preg_replace('@<img src="http://www.nouvelles.uqam.ca@', '<img src="', $entity->body['und'][0]['value']);
+      if ($entity->body['und'][0]['summary'] && strpos($entity->body['und'][0]['summary'], '<img src="http://www.nouvelles.uqam.ca') !== FALSE) {
+        preg_replace('@<img src="http://www.nouvelles.uqam.ca@', '<img src="', $entity->body['und'][0]['summary']);
+      }
+    }
+    $image = ArchivesMigration::_fetch_image($row->nid, $entity->nid);
+    $entity = ArchivesMigration::_insert_image($row, $entity, $image);
+    //drupal_debug($entity, 'ArchivesMigration::complete($entity)');
+  }
+}
+
